@@ -1,0 +1,256 @@
+<header class="app-header">
+  <div class="app-header__inner">
+    <svg class="app-header__logo" viewBox="0 0 23 23" aria-hidden="true">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022" />
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00" />
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef" />
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900" />
+    </svg>
+    <span class="app-header__title">Marketplace Payout Checker</span>
+  </div>
+</header>
+
+<main class="page">
+  <section class="intro">
+    <h1 class="text-title">When will I get paid?</h1>
+    <p class="text-body secondary">
+      Answer a few questions about a Microsoft commercial marketplace transaction to estimate when
+      Microsoft invoices the customer and when you can expect your payout.
+    </p>
+  </section>
+
+  <div class="layout">
+    <form
+      class="card"
+      [formGroup]="form"
+      (ngSubmit)="onSubmit()"
+      novalidate
+      aria-labelledby="form-title"
+    >
+      <h2 id="form-title" class="text-subtitle">Transaction details</h2>
+
+      <div class="field">
+        <label class="field__label" for="transactionDate">
+          When did the transaction happen?
+          <span class="required" aria-hidden="true">*</span>
+        </label>
+        <span id="transactionDate-hint" class="field__hint">
+          The purchase or renewal date, or any day in the month of metered usage.
+        </span>
+        <input
+          id="transactionDate"
+          class="input"
+          type="date"
+          formControlName="transactionDate"
+          required
+          aria-describedby="transactionDate-hint"
+          [attr.aria-invalid]="form.controls.transactionDate.touched && transactionDateInvalid()"
+        />
+        @if (form.controls.transactionDate.touched && transactionDateInvalid()) {
+          <span class="field__error" role="alert">Enter a valid transaction date.</span>
+        }
+      </div>
+
+      <fieldset class="field">
+        <legend class="field__label">
+          How did the customer buy your offer?
+          <span class="required" aria-hidden="true">*</span>
+        </legend>
+        <div class="choice-group">
+          @for (option of agreements; track option.value) {
+            <label class="choice">
+              <input
+                type="radio"
+                formControlName="agreement"
+                name="agreement"
+                [value]="option.value"
+                [id]="'agreement-' + option.value"
+              />
+              <span class="choice__text">
+                <span class="choice__label">{{ option.label }}</span>
+                <span class="choice__description">{{ option.description }}</span>
+              </span>
+            </label>
+          }
+        </div>
+        @if (form.controls.agreement.touched && form.controls.agreement.invalid) {
+          <span class="field__error" role="alert">Select how the customer bought your offer.</span>
+        }
+      </fieldset>
+
+      @if (agreement() === 'ea') {
+        <fieldset class="field">
+          <legend class="field__label">
+            How often is the customer invoiced for Marketplace charges?
+          </legend>
+          <div class="choice-group choice-group--inline">
+            @for (option of eaFrequencies; track option.value) {
+              <label class="choice">
+                <input
+                  type="radio"
+                  formControlName="eaBillingFrequency"
+                  name="eaBillingFrequency"
+                  [value]="option.value"
+                  [id]="'eaBillingFrequency-' + option.value"
+                />
+                <span class="choice__text">
+                  <span class="choice__label">{{ option.label }}</span>
+                  <span class="choice__description">{{ option.description }}</span>
+                </span>
+              </label>
+            }
+          </div>
+        </fieldset>
+      }
+
+      @if (showPaymentMethod()) {
+        <fieldset class="field">
+          <legend class="field__label">How does the customer pay Microsoft?</legend>
+          <div class="choice-group choice-group--inline">
+            @for (option of paymentMethods; track option.value) {
+              <label class="choice">
+                <input
+                  type="radio"
+                  formControlName="paymentMethod"
+                  name="paymentMethod"
+                  [value]="option.value"
+                  [id]="'paymentMethod-' + option.value"
+                />
+                <span class="choice__text">
+                  <span class="choice__label">{{ option.label }}</span>
+                  <span class="choice__description">{{ option.description }}</span>
+                </span>
+              </label>
+            }
+          </div>
+        </fieldset>
+      }
+
+      @if (showPaymentTerms()) {
+        <div class="field">
+          <label class="field__label" for="paymentTermsDays">
+            {{
+              agreement() === 'csp'
+                ? 'What are the CSP partner’s payment terms?'
+                : 'What are the customer’s payment terms?'
+            }}
+          </label>
+          <span id="paymentTermsDays-hint" class="field__hint"
+            >Number of days after the invoice date that payment is due.</span
+          >
+          <select
+            id="paymentTermsDays"
+            class="input"
+            formControlName="paymentTermsDays"
+            aria-describedby="paymentTermsDays-hint"
+          >
+            @for (days of paymentTermsOptions; track days) {
+              <option [ngValue]="days">Net {{ days }} days</option>
+            }
+          </select>
+        </div>
+      }
+
+      <div class="field">
+        <label class="switch">
+          <input type="checkbox" role="switch" formControlName="payoutProfileComplete" />
+          <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+          <span class="switch__label"
+            >My payout and tax profiles are complete in Partner Center</span
+          >
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="button button--primary">Check payout date</button>
+        <button type="button" class="button" (click)="onReset()">Start over</button>
+      </div>
+    </form>
+
+    <section class="results" aria-live="polite" aria-labelledby="results-title">
+      @if (estimate(); as result) {
+        <div class="card card--result">
+          <h2 id="results-title" class="text-caption secondary">Expected payout</h2>
+          <p class="payout-date">On or around {{ result.payoutDate | date: 'MMMM d, y' }}</p>
+          <p class="text-body secondary">
+            About {{ result.daysFromTransaction }} days after the transaction.
+            @if (result.dependsOnCollection) {
+              Timing depends on Microsoft collecting payment.
+            } @else {
+              Payout doesn't wait for customer payment.
+            }
+          </p>
+
+          <div class="badges">
+            <span class="badge">Invoiced ~{{ result.invoiceDate | date: 'MMM d, y' }}</span>
+            @if (result.paymentDate) {
+              <span class="badge">Paid ~{{ result.paymentDate | date: 'MMM d, y' }}</span>
+            }
+            @if (!form.controls.payoutProfileComplete.value) {
+              <span class="badge badge--warning">Payout on hold</span>
+            }
+          </div>
+
+          <h3 class="text-body-strong">Timeline</h3>
+          <ol class="timeline">
+            @for (step of result.steps; track step.kind) {
+              <li class="timeline__item" [class.timeline__item--payout]="step.kind === 'payout'">
+                <span class="timeline__marker" aria-hidden="true"></span>
+                <div class="timeline__content">
+                  <div class="timeline__header">
+                    <span class="text-body-strong">{{ step.title }}</span>
+                    <span class="timeline__date">
+                      {{ step.approximate ? '~' : '' }}{{ step.date | date: 'MMM d, y' }}
+                    </span>
+                  </div>
+                  <p class="text-caption secondary">{{ step.description }}</p>
+                </div>
+              </li>
+            }
+          </ol>
+
+          <h3 class="text-body-strong">Good to know</h3>
+          <ul class="notes">
+            @for (note of result.notes; track note) {
+              <li class="text-caption">{{ note }}</li>
+            }
+          </ul>
+        </div>
+      } @else {
+        <div class="card card--empty">
+          <svg class="empty-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <rect
+              x="6"
+              y="10"
+              width="36"
+              height="32"
+              rx="4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+            />
+            <path
+              d="M6 18h36M16 6v8M32 6v8"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <circle cx="24" cy="30" r="4" fill="currentColor" />
+          </svg>
+          <h2 id="results-title" class="text-subtitle">Your payout estimate appears here</h2>
+          <p class="text-body secondary">
+            Fill out the transaction details and select <strong>Check payout date</strong>.
+          </p>
+        </div>
+      }
+
+      <aside class="disclaimer text-caption secondary">
+        Estimates are based on the
+        <a [href]="policyUrl" target="_blank" rel="noopener noreferrer"
+          >Microsoft commercial marketplace payout policy</a
+        >. Actual dates can vary with invoice dates, payment processing, holidays, and holds. Check
+        <strong>Payouts</strong> in Partner Center for the status of a specific transaction.
+      </aside>
+    </section>
+  </div>
+</main>
